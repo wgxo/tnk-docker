@@ -4,3 +4,7 @@ novo-relay/
 novobean/
 realtime-engine/
 service-purify/
+kayako-frontend-cp/
+kayako-messenger/
+kayako-package-product/
+*.bak
