@@ -68,8 +68,10 @@ out " - Setting up symbolic links"
 cd ../aladdin
 
 out " - Fixing brewfictus hostname"
-grep -rl brewfictus.kayako.com ../* 2>/dev/null | while read f; do
-    perl -pi -e 's[brewfictus.kayako.com][brewfictus.kayako.com]' $f
+grep -rl brewfictus.kayakodev.com ../* 2>/dev/null | while read f; do
+    if [[ $string != *"setup_and_deploy_tnk"* ]]; then
+	perl -pi -e 's[brewfictus.kayakodev.com][brewfictus.kayako.com]' $f
+    fi
 done
 
 out " - Copying config files"
@@ -101,5 +103,17 @@ docker-compose exec -T redis ash -c 'redis-cli flushall' || die "Cannot flush re
 
 out " - Setting up TNK"
 docker-compose exec -T php bash -c 'cd /var/www/html/product/setup && php console.setup.php "Brewfictus" "brewfictus.kayako.com" "Brewfictus" "admin@kayako.com" "setup"' || die "Cannot setup TNK"
+
+blue " - Building KRE"
+purple "   - Updating docker-compose.yml"
+(grep -q KRE_PORT docker-compose.yml) || sed -i 's/\(KRE_ENV: vagrant\)/\1\n      KRE_PORT: 8102/' docker-compose.yml
+purple "   - Starting KRE"
+docker-compose up -d --build kre
+
+blue " - Building novobean"
+purple "   - Updating docker-compose.yml"
+(grep -q NOVOBEAN_LINK docker-compose.yml) || sed -i 's/\(context: \.\.\/novobean\)/\1\n    #NOVOBEAN_LINK\n    links:\n     - beanstalkd/' docker-compose.yml
+purple "   - Starting novobean"
+docker-compose up -d --build novobean
 
 green "SUCCESS!!"
