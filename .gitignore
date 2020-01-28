@@ -1,0 +1,7 @@
+.gitignore
+aladdin/
+novo-api/
+novo-relay/
+novobean/
+realtime-engine/
+service-purify/
