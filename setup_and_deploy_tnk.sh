@@ -17,6 +17,9 @@ yellow() echo "${YELLOW}$@${NOCOLOR}"
 purple() echo "${PURPLE}$@${NOCOLOR}"
 cyan()   echo "${CYAN}$@${NOCOLOR}"
 
+BUILD=""
+if [ $# -gt 0 ]; then BUILD="--build"; fi
+
 blue "*** SETTING UP AND DEPLOYING TNK ***"
 
 (command -v docker >/dev/null 2>&1 && out " - Docker is installed") || die "Docker is not installed!"
@@ -48,13 +51,13 @@ purple "   - realtime-engine"
 [ -d realtime-engine/.git ] || git clone git@github.com:trilogy-group/kayako-realtime-engine realtime-engine >/dev/null || die "Cannot clone repository"
 
 purple "   - novo-relay"
-[ -d novo-relay/.git ] || git clone git@github.com:trilogy-group/kayako-novo-relay novo-relay >/dev/null || die "Cannot clone repository"
+[ -d novo-relay/.git ] || git clone --single-branch --branch feature/migrate-to-python3 git@github.com:trilogy-group/kayako-novo-relay novo-relay >/dev/null || die "Cannot clone repository"
 
 purple "   - service-purify"
 [ -d service-purify/.git ] || git clone git@github.com:trilogy-group/kayako-service-purify service-purify >/dev/null || die "Cannot clone repository"
 
 purple "   - novobean"
-[ -d novobean/.git ] || git clone git@github.com:trilogy-group/kayako-novobean novobean >/dev/null || die "Cannot clone repository"
+[ -d novobean/.git ] || git clone --single-branch --branch feature/migrate-to-python3 git@github.com:trilogy-group/kayako-novobean novobean >/dev/null || die "Cannot clone repository"
 
 
 cd novo-api
@@ -95,7 +98,7 @@ out " - Updating php container reference in site.conf"
 perl -pi -e 's[php5:9000][php:9000]' web/site.conf
 
 out " - Building web container"
-docker-compose up -d --build web || die "Cannot start web container"
+docker-compose up -d $BUILD web || die "Cannot start web container"
 
 out " - Rebuilding database"
 docker-compose exec -T db mysql -u root -pOGYxYmI1OTUzZmM -e 'drop database if exists `brewfictus.kayako.com`; create database `brewfictus.kayako.com`;' || die "Cannot setup database"
@@ -108,12 +111,12 @@ blue " - Building KRE"
 purple "   - Updating docker-compose.yml"
 (grep -q KRE_PORT docker-compose.yml) || sed -i 's/\(KRE_ENV: vagrant\)/\1\n      KRE_PORT: 8102/' docker-compose.yml
 purple "   - Starting KRE"
-docker-compose up -d --build kre
+docker-compose up -d $BUILD kre
 
 blue " - Building novobean"
 purple "   - Updating docker-compose.yml"
 (grep -q NOVOBEAN_LINK docker-compose.yml) || sed -i 's/\(context: \.\.\/novobean\)/\1\n    #NOVOBEAN_LINK\n    links:\n     - beanstalkd/' docker-compose.yml
 purple "   - Starting novobean"
-docker-compose up -d --build novobean
+docker-compose up -d $BUILD novobean
 
 green "SUCCESS!!"
