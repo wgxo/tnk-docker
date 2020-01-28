@@ -48,60 +48,40 @@ fi
 out    " - Cloning repositories:"
 
 purple "   - aladdin"
-[ -d aladdin/.git ] || git clone git@github.com:trilogy-group/kayako-aladdin aladdin >/dev/null || die "Cannot clone repository"
-
-pause
+[ -d aladdin/.git ] || (git clone git@github.com:trilogy-group/kayako-aladdin aladdin >/dev/null && pause) || die "Cannot clone repository"
 
 purple "   - novo-api"
-[ -d novo-api/.git ] || git clone git@github.com:trilogy-group/kayako-novo-api novo-api >/dev/null || die "Cannot clone repository"
-
-pause
+[ -d novo-api/.git ] || (git clone git@github.com:trilogy-group/kayako-novo-api novo-api >/dev/null && pause) || die "Cannot clone repository"
 
 purple "   - app-frontend"
-[ -d novo-api/Novo/app-frontend/.git ] || git clone git@github.com:trilogy-group/kayako-app-frontend novo-api/Novo/app-frontend >/dev/null || die "Cannot clone repository"
-
-pause
+[ -d novo-api/Novo/app-frontend/.git ] || (git clone git@github.com:trilogy-group/kayako-app-frontend novo-api/Novo/app-frontend >/dev/null && pause) || die "Cannot clone repository"
 
 purple "   - app-widget"
-[ -d novo-api/Novo/app-widget/.git ] || git clone git@github.com:trilogy-group/kayako-app-widget novo-api/Novo/app-widget >/dev/null || die "Cannot clone repository"
-
-pause
+[ -d novo-api/Novo/app-widget/.git ] || (git clone git@github.com:trilogy-group/kayako-app-widget novo-api/Novo/app-widget >/dev/null && pause) || die "Cannot clone repository"
 
 purple "   - realtime-engine"
-[ -d realtime-engine/.git ] || git clone git@github.com:trilogy-group/kayako-realtime-engine realtime-engine >/dev/null || die "Cannot clone repository"
-
-pause
+[ -d realtime-engine/.git ] || (git clone git@github.com:trilogy-group/kayako-realtime-engine realtime-engine >/dev/null && pause) || die "Cannot clone repository"
 
 purple "   - novo-relay"
-[ -d novo-relay/.git ] || git clone --single-branch --branch feature/migrate-to-python3 git@github.com:trilogy-group/kayako-novo-relay novo-relay >/dev/null || die "Cannot clone repository"
-
-pause
+[ -d novo-relay/.git ] || (git clone --single-branch --branch feature/migrate-to-python3 git@github.com:trilogy-group/kayako-novo-relay novo-relay >/dev/null && pause) || die "Cannot clone repository"
 
 purple "   - service-purify"
-[ -d service-purify/.git ] || git clone git@github.com:trilogy-group/kayako-service-purify service-purify >/dev/null || die "Cannot clone repository"
-
-pause
+[ -d service-purify/.git ] || (git clone git@github.com:trilogy-group/kayako-service-purify service-purify >/dev/null && pause) || die "Cannot clone repository"
 
 purple "   - novobean"
-[ -d novobean/.git ] || git clone --single-branch --branch feature/migrate-to-python3 git@github.com:trilogy-group/kayako-novobean novobean >/dev/null || die "Cannot clone repository"
-
-pause
+[ -d novobean/.git ] || (git clone --single-branch --branch feature/migrate-to-python3 git@github.com:trilogy-group/kayako-novobean novobean >/dev/null && pause) || die "Cannot clone repository"
 
 cp links.sh novo-api/
 cd novo-api
 
 out " - Updating submodules"
-[ -f Novo/app-account/.git ] || (git submodule init && git submodule update --remote || die "Cannot initialize submodules")
-
-pause
+[ -f Novo/app-account/.git ] || (git submodule init && git submodule update --remote && pause) || die "Cannot initialize submodules"
 
 out " - Setting up symbolic links"
 ./links.sh
-
-cd ../aladdin
-
 pause
 
+cd ../aladdin
 out " - Fixing brewfictus hostname"
 grep -rl brewfictus.kayakodev.com ../* 2>/dev/null | while read f; do
     # ignore ths script
@@ -127,7 +107,7 @@ EOF
 
 pause
 
-out " - Updating docker-compose file"
+out " - Updating docker-compose file for kre and relay"
 perl -pi -e 's[context: ../kayako-realtime-engine][context: ../realtime-engine]' docker-compose.yml
 perl -pi -e 's[context: ../relay][context: ../novo-relay]' docker-compose.yml
 
