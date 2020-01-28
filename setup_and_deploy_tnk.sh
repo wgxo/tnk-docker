@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# exit on error
+set -e
+
 # COLORS
 BROWN="\033[0;33m"; BLUE="\033[1;34m"; RED="\033[0;31m"; LIGHT_RED="\033[1;31m"; PURPLE="\033[1;35m"
 GREEN="\033[1;32m"; WHITE="\033[1;37m"; LIGHT_GRAY="\033[0;37m"; YELLOW="\033[1;33m"; CYAN="\033[1;36m"
@@ -18,7 +21,16 @@ purple() echo "${PURPLE}$@${NOCOLOR}"
 cyan()   echo "${CYAN}$@${NOCOLOR}"
 
 BUILD=""
-if [ $# -gt 0 ]; then BUILD="--build"; fi
+PAUSE=0
+if [ $# -gt 0 -a "$1" = "-f" ]; then BUILD="--build"; fi
+if [ $# -gt 0 -a "$1" = "-p" ]; then PAUSE=1; fi
+
+pause() {
+    if [ $PAUSE ]; then
+	echo "Press ENTER to continue..."
+	read key <&1
+    fi
+}
 
 blue "*** SETTING UP AND DEPLOYING TNK ***"
 
@@ -38,47 +50,70 @@ out    " - Cloning repositories:"
 purple "   - aladdin"
 [ -d aladdin/.git ] || git clone git@github.com:trilogy-group/kayako-aladdin aladdin >/dev/null || die "Cannot clone repository"
 
+pause
+
 purple "   - novo-api"
 [ -d novo-api/.git ] || git clone git@github.com:trilogy-group/kayako-novo-api novo-api >/dev/null || die "Cannot clone repository"
+
+pause
 
 purple "   - app-frontend"
 [ -d novo-api/Novo/app-frontend/.git ] || git clone git@github.com:trilogy-group/kayako-app-frontend novo-api/Novo/app-frontend >/dev/null || die "Cannot clone repository"
 
+pause
+
 purple "   - app-widget"
 [ -d novo-api/Novo/app-widget/.git ] || git clone git@github.com:trilogy-group/kayako-app-widget novo-api/Novo/app-widget >/dev/null || die "Cannot clone repository"
+
+pause
 
 purple "   - realtime-engine"
 [ -d realtime-engine/.git ] || git clone git@github.com:trilogy-group/kayako-realtime-engine realtime-engine >/dev/null || die "Cannot clone repository"
 
+pause
+
 purple "   - novo-relay"
 [ -d novo-relay/.git ] || git clone --single-branch --branch feature/migrate-to-python3 git@github.com:trilogy-group/kayako-novo-relay novo-relay >/dev/null || die "Cannot clone repository"
+
+pause
 
 purple "   - service-purify"
 [ -d service-purify/.git ] || git clone git@github.com:trilogy-group/kayako-service-purify service-purify >/dev/null || die "Cannot clone repository"
 
+pause
+
 purple "   - novobean"
 [ -d novobean/.git ] || git clone --single-branch --branch feature/migrate-to-python3 git@github.com:trilogy-group/kayako-novobean novobean >/dev/null || die "Cannot clone repository"
 
+pause
 
+cp links.sh novo-api/
 cd novo-api
 
 out " - Updating submodules"
 [ -f Novo/app-account/.git ] || (git submodule init && git submodule update --remote || die "Cannot initialize submodules")
+
+pause
 
 out " - Setting up symbolic links"
 ./links.sh
 
 cd ../aladdin
 
+pause
+
 out " - Fixing brewfictus hostname"
 grep -rl brewfictus.kayakodev.com ../* 2>/dev/null | while read f; do
-    if [[ $string != *"setup_and_deploy_tnk"* ]]; then
-	perl -pi -e 's[brewfictus.kayakodev.com][brewfictus.kayako.com]' $f
-    fi
+    # ignore ths script
+    (echo $f | grep -q `basename $0`) || perl -pi -e 's[brewfictus.kayakodev.com][brewfictus.kayako.com]' $f
 done
+
+pause
 
 out " - Copying config files"
 cp -fva configs/novo-api/* ../novo-api/__config/ | sed -e 's/^.*\///' -e "s/'//" 
+
+pause
 
 out " - Creating .env file"
 cat <<EOF > .env
@@ -90,22 +125,34 @@ BLACKFIRE_SERVER_ID=
 BLACKFIRE_SERVER_TOKEN=
 EOF
 
+pause
+
 out " - Updating docker-compose file"
 perl -pi -e 's[context: ../kayako-realtime-engine][context: ../realtime-engine]' docker-compose.yml
 perl -pi -e 's[context: ../relay][context: ../novo-relay]' docker-compose.yml
 
+pause
+
 out " - Updating php container reference in site.conf"
 perl -pi -e 's[php5:9000][php:9000]' web/site.conf
 
+pause
+
 out " - Building web container"
 docker-compose up -d $BUILD web || die "Cannot start web container"
+
+pause
 
 out " - Rebuilding database"
 docker-compose exec -T db mysql -u root -pOGYxYmI1OTUzZmM -e 'drop database if exists `brewfictus.kayako.com`; create database `brewfictus.kayako.com`;' || die "Cannot setup database"
 docker-compose exec -T redis ash -c 'redis-cli flushall' || die "Cannot flush redis"
 
+pause
+
 out " - Setting up TNK"
 docker-compose exec -T php bash -c 'cd /var/www/html/product/setup && php console.setup.php "Brewfictus" "brewfictus.kayako.com" "Brewfictus" "admin@kayako.com" "setup"' || die "Cannot setup TNK"
+
+pause
 
 blue " - Building KRE"
 purple "   - Updating docker-compose.yml"
@@ -113,9 +160,14 @@ purple "   - Updating docker-compose.yml"
 purple "   - Starting KRE"
 docker-compose up -d $BUILD kre
 
+pause
+
 blue " - Building novobean"
 purple "   - Updating docker-compose.yml"
 (grep -q NOVOBEAN_LINK docker-compose.yml) || sed -i 's/\(context: \.\.\/novobean\)/\1\n    #NOVOBEAN_LINK\n    links:\n     - beanstalkd/' docker-compose.yml
+
+pause
+
 purple "   - Starting novobean"
 docker-compose up -d $BUILD novobean
 
