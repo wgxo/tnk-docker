@@ -8,3 +8,7 @@ kayako-frontend-cp/
 kayako-messenger/
 kayako-package-product/
 *.bak
+frontendcp/
+package-backend/
+package-billing/
+package-product/

@@ -26,8 +26,8 @@ if [ $# -gt 0 -a "$1" = "-f" ]; then BUILD="--build"; fi
 if [ $# -gt 0 -a "$1" = "-p" ]; then PAUSE=1; fi
 
 pause() {
-    if [ $PAUSE ]; then
-	echo "Press ENTER to continue..."
+    if [ $PAUSE -eq 1 ]; then
+	yellow "Press ENTER to continue..."
 	read key <&1
     fi
 }
@@ -47,108 +47,109 @@ fi
 
 out    " - Cloning repositories:"
 
+purple "   - package-product"
+[ -d package-product/.git ] || (git clone --single-branch --branch develop git@github.com:trilogy-group/kayako-package-product package-product >/dev/null && cd package-product && git submodule init >/dev/null && git submodule update --remote >/dev/null && pause) || die "Cannot clone repository"
+
+purple "   - frontend-cp"
+[ -d frontendcp/.git ] || (git clone --single-branch --branch develop git@github.com:trilogy-group/kayako-frontend-cp frontendcp >/dev/null && pause) || die "Cannot clone repository"
+
+purple "   - package-backend"
+[ -d package-backend/.git ] || (git clone git@github.com:trilogy-group/kayako-package-backend package-backend >/dev/null && pause) || die "Cannot clone repository"
+
+purple "   - package-billing"
+[ -d package-billing/.git ] || (git clone git@github.com:trilogy-group/kayako-package-billing package-billing >/dev/null && pause) || die "Cannot clone repository"
+
 purple "   - aladdin"
 [ -d aladdin/.git ] || (git clone git@github.com:trilogy-group/kayako-aladdin aladdin >/dev/null && pause) || die "Cannot clone repository"
 
-purple "   - novo-api"
-[ -d novo-api/.git ] || (git clone git@github.com:trilogy-group/kayako-novo-api novo-api >/dev/null && pause) || die "Cannot clone repository"
-
-purple "   - app-frontend"
-[ -d novo-api/Novo/app-frontend/.git ] || (git clone git@github.com:trilogy-group/kayako-app-frontend novo-api/Novo/app-frontend >/dev/null && pause) || die "Cannot clone repository"
-
-purple "   - app-widget"
-[ -d novo-api/Novo/app-widget/.git ] || (git clone git@github.com:trilogy-group/kayako-app-widget novo-api/Novo/app-widget >/dev/null && pause) || die "Cannot clone repository"
-
-purple "   - realtime-engine"
-[ -d realtime-engine/.git ] || (git clone git@github.com:trilogy-group/kayako-realtime-engine realtime-engine >/dev/null && pause) || die "Cannot clone repository"
-
-purple "   - novo-relay"
-[ -d novo-relay/.git ] || (git clone --single-branch --branch feature/migrate-to-python3 git@github.com:trilogy-group/kayako-novo-relay novo-relay >/dev/null && pause) || die "Cannot clone repository"
-
-purple "   - service-purify"
-[ -d service-purify/.git ] || (git clone git@github.com:trilogy-group/kayako-service-purify service-purify >/dev/null && pause) || die "Cannot clone repository"
-
-purple "   - novobean"
-[ -d novobean/.git ] || (git clone --single-branch --branch feature/migrate-to-python3 git@github.com:trilogy-group/kayako-novobean novobean >/dev/null && pause) || die "Cannot clone repository"
-
-cp links.sh novo-api/
-cd novo-api
-
-out " - Updating submodules"
-[ -f Novo/app-account/.git ] || (git submodule init && git submodule update --remote && pause) || die "Cannot initialize submodules"
-
-out " - Setting up symbolic links"
-./links.sh
-pause
-
-cd ../aladdin
 out " - Fixing brewfictus hostname"
-grep -rl brewfictus.kayakodev.com ../* 2>/dev/null | while read f; do
+grep -rl brewfictus.kayakodev.com * 2>/dev/null | while read f; do
     # ignore ths script
-    (echo $f | grep -q `basename $0`) || perl -pi -e 's[brewfictus.kayakodev.com][brewfictus.kayako.com]' $f
+    (echo $f | grep -q `basename $0`) || (blue "   - $f" && perl -pi -e 's[brewfictus.kayakodev.com][brewfictus.kayako.com]' $f)
 done
 
 pause
 
-out " - Copying config files"
-cp -fva configs/novo-api/* ../novo-api/__config/ | sed -e 's/^.*\///' -e "s/'//" 
-
-pause
-
 out " - Creating .env file"
-cat <<EOF > .env
-CODE_PATH=../novo-api
-# here to stop docker complaining that the variable is not set
-BLACKFIRE_CLIENT_ID=
-BLACKFIRE_CLIENT_TOKEN=
-BLACKFIRE_SERVER_ID=
-BLACKFIRE_SERVER_TOKEN=
+cat <<EOF > aladdin/.env
+# TNK Code
+CODE_PATH=`pwd`/package-product 
+
+# Projects that will be added next
+# my.kayako.com
+BACKEND_PATH=`pwd`/package-backend
+# billing.kayako.com
+BILLING_PATH=`pwd`/package-billing
 EOF
 
 pause
 
-out " - Updating docker-compose file for kre and relay"
-perl -pi -e 's[context: ../kayako-realtime-engine][context: ../realtime-engine]' docker-compose.yml
-perl -pi -e 's[context: ../relay][context: ../novo-relay]' docker-compose.yml
+out " - Preparing frontend-cp"
+cat <<EOF > frontendcp/entrypoint.sh
+yarn install
+bower --allow-root install
+ember s -H 0.0.0.0 --ssl false --proxy https://web
+EOF
+
+chmod +x frontendcp/entrypoint.sh
+
+cat <<EOF > frontendcp/docker-compose.yml
+version: '3'
+services:
+  frontend-cp:
+    container_name: frontendcp
+    image: registry2.swarm.devfactory.com/kayako/jenkins-frontend:latest
+    ports:
+     - "4200:4200"
+    command: /bin/sh /app/entrypoint.sh
+    volumes:
+     - .:/app
+    working_dir: /app
+    networks:
+      default:
+        aliases:
+          - brewfictus.kayako.com
+EOF
 
 pause
 
-out " - Updating php container reference in site.conf"
-perl -pi -e 's[php5:9000][php:9000]' web/site.conf
+out " - Starting frontend-cp"
+
+(cd frontendcp && (sudo service kerio-kvc stop >/dev/null 2>&1; docker-compose up --no-start >/dev/null || die "Unable to build frontend-cp. Check your VPN") && (sudo service kerio-kvc start >/dev/null 2>&1; docker-compose up -d || die "Unable to build frontend-cp. Check your VPN"))
 
 pause
 
-out " - Building web container"
-docker-compose up -d $BUILD web || die "Cannot start web container"
+out " - Configuring nginx"
+sed -i 's/proxy_pass http.*\:4200;/proxy_pass http\:\/\/frontendcp\:4200;/' aladdin/nginx/product.conf
+
+out " - Updating aladdin/docker-compose.yml"
+grep -q frontendcp_default aladdin/docker-compose.yml || ( \
+perl -pi -e 's[networks:][external_links:\n     - frontendcp\n    networks:\n      frontendcp_default:]gs' aladdin/docker-compose.yml
+cat <<EOF >> aladdin/docker-compose.yml )
+
+networks:
+  frontendcp_default:
+    external: true
+EOF
+
+pause
+
+out " - Starting aladdin"
+
+(cd aladdin && (sudo service kerio-kvc stop >/dev/null 2>&1; docker-compose up --no-start >/dev/null || die "Unable to build aladdin. Check your VPN") && (sudo service kerio-kvc start >/dev/null 2>&1; docker-compose up -d || die "Unable to build frontend-cp. Check your VPN"))
 
 pause
 
 out " - Rebuilding database"
-docker-compose exec -T db mysql -u root -pOGYxYmI1OTUzZmM -e 'drop database if exists `brewfictus.kayako.com`; create database `brewfictus.kayako.com`;' || die "Cannot setup database"
-docker-compose exec -T redis ash -c 'redis-cli flushall' || die "Cannot flush redis"
+sleep 3 # wait for container to be ready
+(cd aladdin && (docker-compose exec -T db mysql -u root -pOGYxYmI1OTUzZmM -e 'drop database if exists `brewfictus.kayako.com`; create database `brewfictus.kayako.com` character set = utf8mb4 collate = utf8mb4_unicode_ci;' || die "Cannot setup database. Check the container status"))
+
+out " - Flushing redis"
+(cd aladdin && (docker-compose exec -T redis ash -c 'redis-cli flushall' || die "Cannot flush redis"))
 
 pause
 
 out " - Setting up TNK"
-docker-compose exec -T php bash -c 'cd /var/www/html/product/setup && php console.setup.php "Brewfictus" "brewfictus.kayako.com" "Brewfictus" "admin@kayako.com" "setup"' || die "Cannot setup TNK"
-
-pause
-
-blue " - Building KRE"
-purple "   - Updating docker-compose.yml"
-(grep -q KRE_PORT docker-compose.yml) || sed -i 's/\(KRE_ENV: vagrant\)/\1\n      KRE_PORT: 8102/' docker-compose.yml
-purple "   - Starting KRE"
-docker-compose up -d $BUILD kre
-
-pause
-
-blue " - Building novobean"
-purple "   - Updating docker-compose.yml"
-(grep -q NOVOBEAN_LINK docker-compose.yml) || sed -i 's/\(context: \.\.\/novobean\)/\1\n    #NOVOBEAN_LINK\n    links:\n     - beanstalkd/' docker-compose.yml
-
-pause
-
-purple "   - Starting novobean"
-docker-compose up -d $BUILD novobean
+(cd aladdin && (docker-compose exec -T product bash -c 'cd /var/www/html/product/setup && php console.setup.php "Brewfictus" "brewfictus.kayako.com" "Brewfictus" "admin@kayako.com" "setup"' || die "Cannot setup TNK"))
 
 green "SUCCESS!!"
