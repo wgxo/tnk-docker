@@ -125,6 +125,14 @@ services:
       default:
         aliases:
           - brewfictus.kayako.com
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.18.0.0/24
+
 EOF
 
 pause
@@ -151,6 +159,11 @@ cat <<EOF >> aladdin/docker-compose.yml )
 networks:
   frontendcp_default:
     external: true
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.19.0.0/24
 
 volumes:
   productdata:
