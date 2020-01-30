@@ -38,7 +38,7 @@ and restart the docker daemon: `sudo service docker restart`
 ### Install Kerio VPN on Ubuntu
 1. Install the software: `dpkg -i kerio-control-vpnclient_9.2.9.3171-1_amd64.deb`
 2. Get the TOTP_CONTROL cookie from your machine. [Use this HOW-TO guide](https://confluence.devfactory.com/display/ISK/How+to+set+up+2FA+for+Kerio+VPN+via+Command+Line)
-3. Replace the TOTP_CONTROL cookie in (kerio-kvc.service).
-4. Copy (kerio-kvc.service) to `/lib/systemd/system/kerio-kvc.service`
+3. Replace the TOTP_CONTROL cookie in [kerio-kvc.service](kerio-kvc.service).
+4. Copy [kerio-kvc.service](kerio-kvc.service) to `/lib/systemd/system/kerio-kvc.service`
 5. Enable the VPN service to start automatically: `sudo systemctl enable kerio-kvc`
 6. Start the VPN: `sudo systemctl start kerio-kvc`
