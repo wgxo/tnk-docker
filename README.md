@@ -21,3 +21,14 @@ Update _config.shared.php_ with Sendgrid API credentials:
 
 ### Receive emails in TNK
 Configure Dakiya https://github.com/trilogy-group/kayako-dakiya
+
+### Fix docker-compose up error when Kerio VPN is running
+Add this entry to /etc/docker/daemon.conf:
+
+{ 
+    "default-address-pools": [
+         {"base":"10.10.0.0/16","size":24}
+     ] 
+}
+
+and restart the docker daemon: `sudo service docker restart`

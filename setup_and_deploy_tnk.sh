@@ -13,6 +13,7 @@ die() {
     exit 1
 }
 
+msg()    echo "${RED}$@${NOCOLOR}"
 green()  echo "${GREEN}$@${NOCOLOR}"
 out()    echo "${BROWN}$@${NOCOLOR}"
 blue()   echo "${BLUE}$@${NOCOLOR}"
@@ -32,11 +33,20 @@ pause() {
     fi
 }
 
-blue "*** SETTING UP AND DEPLOYING TNK ***"
+echo "${LIGHT_RED}*** SETTING UP AND DEPLOYING TNK ***${NOCOLOR}"
 
+echo
+
+(command -v kvpncsvc >/dev/null 2>&1 && out " - Kerio VPN is installed") || die "Kerio VPN is not installed!"
 (command -v docker >/dev/null 2>&1 && out " - Docker is installed") || die "Docker is not installed!"
 (command -v docker-compose >/dev/null 2>&1 && out " - Docker compose is installed") || die "Docker Compose is not installed!"
 (command -v git >/dev/null 2>&1 && out " - Git is installed") || die "Git is not installed!"
+
+echo
+msg " > Kerio VPN is needed to pull the docker images from private repositories."
+msg " > Also docker-compose complains about creating networks when the VPN is running."
+msg " > If this issue occurs, just stop/start the VPN and run this script again."
+echo
 
 if [ -z $(grep -Poe '^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?=.*brewfictus.kayako.com)' /etc/hosts) ]; then
     out " - Setting up hosts file"
@@ -115,7 +125,7 @@ pause
 
 out " - Starting frontend-cp"
 
-(cd frontendcp && (sudo service kerio-kvc stop >/dev/null 2>&1; docker-compose up --no-start >/dev/null || die "Unable to build frontend-cp. Check your VPN") && (sudo service kerio-kvc start >/dev/null 2>&1; docker-compose up -d || die "Unable to build frontend-cp. Check your VPN"))
+(cd frontendcp && (docker-compose up --no-start >/dev/null || die "Unable to build frontend-cp. Check your VPN") && (docker-compose up -d || die "Unable to build frontend-cp. Check your VPN"))
 
 pause
 
@@ -136,12 +146,12 @@ pause
 
 out " - Starting aladdin"
 
-(cd aladdin && (sudo service kerio-kvc stop >/dev/null 2>&1; docker-compose up --no-start >/dev/null || die "Unable to build aladdin. Check your VPN") && (sudo service kerio-kvc start >/dev/null 2>&1; docker-compose up -d || die "Unable to build frontend-cp. Check your VPN"))
+(cd aladdin && (docker-compose up --no-start >/dev/null || die "Unable to build aladdin. Check your VPN") && (docker-compose up -d || die "Unable to build frontend-cp. Check your VPN"))
 
 pause
 
 out " - Rebuilding database"
-sleep 3 # wait for container to be ready
+sleep 5 # wait for container to be ready
 (cd aladdin && (docker-compose exec -T db mysql -u root -pOGYxYmI1OTUzZmM -e 'drop database if exists `brewfictus.kayako.com`; create database `brewfictus.kayako.com` character set = utf8mb4 collate = utf8mb4_unicode_ci;' || die "Cannot setup database. Check the container status"))
 
 out " - Flushing redis"
