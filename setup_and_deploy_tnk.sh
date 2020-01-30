@@ -23,8 +23,10 @@ cyan()   echo "${CYAN}$@${NOCOLOR}"
 
 BUILD=""
 PAUSE=0
-if [ $# -gt 0 -a "$1" = "-f" ]; then BUILD="--build"; fi
-if [ $# -gt 0 -a "$1" = "-p" ]; then PAUSE=1; fi
+for arg in "$@"; do
+    if [ "$arg" = "-f" ]; then BUILD="--build"; fi
+    if [ "$arg" = "-p" ]; then PAUSE=1; fi
+done
 
 pause() {
     if [ $PAUSE -eq 1 ]; then
@@ -35,8 +37,9 @@ pause() {
 
 echo "${LIGHT_RED}*** SETTING UP AND DEPLOYING TNK ***${NOCOLOR}"
 
-echo
+msg "Use [-p] flag to pause between steps and [-f] to force building of containers and reset DB"
 
+echo
 (command -v kvpncsvc >/dev/null 2>&1 && out " - Kerio VPN is installed") || die "Kerio VPN is not installed!"
 (command -v docker >/dev/null 2>&1 && out " - Docker is installed") || die "Docker is not installed!"
 (command -v docker-compose >/dev/null 2>&1 && out " - Docker compose is installed") || die "Docker Compose is not installed!"
@@ -62,6 +65,9 @@ purple "   - package-product"
 
 purple "   - frontend-cp"
 [ -d frontendcp/.git ] || (git clone --single-branch --branch develop git@github.com:trilogy-group/kayako-frontend-cp frontendcp >/dev/null && pause) || die "Cannot clone repository"
+
+purple "   - messenger"
+[ -d messenger/.git ] || (git clone --single-branch --branch develop git@github.com:trilogy-group/kayako-messenger messenger >/dev/null && pause) || die "Cannot clone repository"
 
 purple "   - package-backend"
 [ -d package-backend/.git ] || (git clone git@github.com:trilogy-group/kayako-package-backend package-backend >/dev/null && pause) || die "Cannot clone repository"
@@ -125,6 +131,9 @@ pause
 
 out " - Starting frontend-cp"
 
+# fix KRE URL
+sed -i 's/wss\:\/\/kre\.kayako\.net\/socket/ws\:\/\/brewfictus\.kayako\.com\:8102\/socket/' frontendcp/config/environment.js
+
 (cd frontendcp && (docker-compose up --no-start >/dev/null || die "Unable to build frontend-cp. Check your VPN") && (docker-compose up -d || die "Unable to build frontend-cp. Check your VPN"))
 
 pause
@@ -134,12 +143,17 @@ sed -i 's/proxy_pass http.*\:4200;/proxy_pass http\:\/\/frontendcp\:4200;/' alad
 
 out " - Updating aladdin/docker-compose.yml"
 grep -q frontendcp_default aladdin/docker-compose.yml || ( \
+perl -pi -e 's[(\$\{CODE_PATH\}:/code/product)][\1\n      - productdata:/var/www/html/product]gs' aladdin/docker-compose.yml
+perl -pi -e 's[(\$\{CODE_PATH\}:)(/var/www/html/product)][\1/code/product\n      - productdata:\2]gs' aladdin/docker-compose.yml
 perl -pi -e 's[networks:][external_links:\n     - frontendcp\n    networks:\n      frontendcp_default:]gs' aladdin/docker-compose.yml
 cat <<EOF >> aladdin/docker-compose.yml )
 
 networks:
   frontendcp_default:
     external: true
+
+volumes:
+  productdata:
 EOF
 
 pause
@@ -150,16 +164,18 @@ out " - Starting aladdin"
 
 pause
 
-out " - Rebuilding database"
-sleep 5 # wait for container to be ready
-(cd aladdin && (docker-compose exec -T db mysql -u root -pOGYxYmI1OTUzZmM -e 'drop database if exists `brewfictus.kayako.com`; create database `brewfictus.kayako.com` character set = utf8mb4 collate = utf8mb4_unicode_ci;' || die "Cannot setup database. Check the container status"))
+if [ ! -z "$BUILD" ]; then
+    out " - Rebuilding database"
+    sleep 5 # wait for container to be ready
+    (cd aladdin && (docker-compose exec -T db mysql -u root -pOGYxYmI1OTUzZmM -e 'drop database if exists `brewfictus.kayako.com`; create database `brewfictus.kayako.com` character set = utf8mb4 collate = utf8mb4_unicode_ci;' || die "Cannot setup database. Check the container status"))
 
-out " - Flushing redis"
-(cd aladdin && (docker-compose exec -T redis ash -c 'redis-cli flushall' || die "Cannot flush redis"))
+    out " - Flushing redis"
+    (cd aladdin && (docker-compose exec -T redis ash -c 'redis-cli flushall' || die "Cannot flush redis"))
 
-pause
+    pause
 
-out " - Setting up TNK"
-(cd aladdin && (docker-compose exec -T product bash -c 'cd /var/www/html/product/setup && php console.setup.php "Brewfictus" "brewfictus.kayako.com" "Brewfictus" "admin@kayako.com" "setup"' || die "Cannot setup TNK"))
+    out " - Setting up TNK"
+    (cd aladdin && (docker-compose exec -T product bash -c 'cd /var/www/html/product/setup && php console.setup.php "Brewfictus" "brewfictus.kayako.com" "Brewfictus" "admin@kayako.com" "setup"' || die "Cannot setup TNK"))
+fi
 
 green "SUCCESS!!"
