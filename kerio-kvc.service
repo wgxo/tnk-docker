@@ -1,0 +1,22 @@
+# This service is actually a systemd target,
+# but we are using a service since targets cannot be reloaded.
+
+[Unit]
+Description=Kerio Control VPN Client
+After=network.target
+
+[Service]
+Type=forking
+Restart=always
+RestartSec=5
+ExecStartPre=/bin/sed -i '/nameserver 10./d' /etc/resolv.conf
+ExecStart=/usr/sbin/kvpncsvc /var/lib/kerio-control-vpn 2>&1 | logger -p daemon.err -t kerio-control-vpnclient 2>/dev/null
+ExecReload=/usr/bin/pkill -SIGHUP kvpncsvc
+ExecStartPost=/bin/sleep 5
+ExecStartPost=/bin/nohup /bin/sh -c '/usr/bin/curl -sS --cookie "TOTP_CONTROL=#################" http://10.212.255.245:4080/nonauth/totpVerify.cs'
+
+[Install]
+Alias=kerio-vpn
+Alias=kerio-control-vpn
+Alias=kerio-control-vpnclient
+WantedBy=multi-user.target
