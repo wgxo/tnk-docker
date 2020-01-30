@@ -117,6 +117,7 @@ services:
     image: registry2.swarm.devfactory.com/kayako/jenkins-frontend:latest
     ports:
      - "4200:4200"
+     - "7020:7020"
     command: /bin/sh /app/entrypoint.sh
     volumes:
      - .:/app
@@ -148,6 +149,7 @@ pause
 
 out " - Configuring nginx"
 sed -i 's/proxy_pass http.*\:4200;/proxy_pass http\:\/\/frontendcp\:4200;/' aladdin/nginx/product.conf
+sed -i 's/\(location \~ \^\/(\)agent/\1sounds\|agent/' aladdin/nginx/product.conf
 
 out " - Updating aladdin/docker-compose.yml"
 grep -q frontendcp_default aladdin/docker-compose.yml || ( \

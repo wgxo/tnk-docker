@@ -23,17 +23,25 @@ Update _config.shared.php_ with Sendgrid API credentials:
 Configure Dakiya https://github.com/trilogy-group/kayako-dakiya
 
 ### Fix docker-compose up error when Kerio VPN is running
-Add this entry to /etc/docker/daemon.conf:
+Running the following shows the reserved networks from Kerio and from Docker:
 
 ```
-{ 
-    "default-address-pools": [
-         {"base":"10.10.0.0/16","size":24}
-     ] 
-}
+$ route -n|grep 172
+172.16.0.0      44.175.0.1      255.240.0.0     UG    1      0        0 kvnet
+172.17.0.0      0.0.0.0         255.255.255.0   U     0      0        0 docker0
 ```
 
-and restart the docker daemon: `sudo service docker restart`
+The fix is to add any unused network to the docker-compose.yml files:
+
+```
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.19.0.0/24
+
+```
 
 ### Install Kerio VPN on Ubuntu
 1. Install the software: `dpkg -i kerio-control-vpnclient_9.2.9.3171-1_amd64.deb`
