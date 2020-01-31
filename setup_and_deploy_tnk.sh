@@ -104,7 +104,7 @@ out " - Preparing frontend-cp"
 cat <<EOF > frontendcp/entrypoint.sh
 yarn install
 bower --allow-root install
-ember s -H 0.0.0.0 --ssl false --proxy https://web
+ember s -H 0.0.0.0 --proxy https://web
 EOF
 
 chmod +x frontendcp/entrypoint.sh
@@ -138,20 +138,31 @@ EOF
 
 pause
 
+out " - Fixing frontend-cp environment"
+perl -pi -e "s[('https://\*\.kayakocdn\.com',)$][\1'https://*.kayako.com',]gs" frontendcp/config/environment.js 
+perl -pi -e "s[(// 'ws://localhost:8102',)$]['wss://*.kayako.com:4443','wss://*.kayako.com:7020',]gs" frontendcp/config/environment.js 
+perl -pi -e "s[('https://src.litix.io',) // wistia$][\1'https://*.kayako.com:7020']gs" frontendcp/config/environment.js 
+perl -pi -e "s[('https://*.kayakocdn.com')$][\1,'https://*.kayako.com']gs" frontendcp/config/environment.js 
+perl -pi -e "s[(messengerApiUrl: 'https://)support(.kayako.com)][\1brewfictus\2]gs" frontendcp/config/environment.js 
+perl -pi -e "s[(messengerAssetsUrl: 'https://)assets(.kayako.com)][\1brewfictus\2/__apps]gs" frontendcp/config/environment.js 
+perl -pi -e "s[(ENV.kreSocket = 'wss://)kre.kayako.net(/socket';) // Production][\1brewfictus.kayako.com:4443\2]gs" frontendcp/config/environment.js
+perl -pi -e "s[('wss://)kre.vagrant.internal(:4443 ')][\1brewfictus.kayako.com\2]gs" frontendcp/config/environment.js 
+perl -pi -e "s[(ENV.appsApiUrl = 'https://)apps.kayako.net(';)][\1brewfictus.kayako.com\2]gs" frontendcp/config/environment.js 
+
+pause
+
 out " - Starting frontend-cp"
-
-# fix KRE URL
-sed -i 's/wss\:\/\/kre\.kayako\.net\/socket/ws\:\/\/brewfictus\.kayako\.com\:8102\/socket/' frontendcp/config/environment.js
-
 (cd frontendcp && (docker-compose up --no-start >/dev/null || die "Unable to build frontend-cp. Check your VPN") && (docker-compose up -d || die "Unable to build frontend-cp. Check your VPN"))
 
 pause
 
 out " - Configuring nginx"
-sed -i 's/proxy_pass http.*\:4200;/proxy_pass http\:\/\/frontendcp\:4200;/' aladdin/nginx/product.conf
+sed -i 's/proxy_pass http.*\:4200;/proxy_pass https\:\/\/frontendcp\:4200;/' aladdin/nginx/product.conf
 sed -i 's/\(location \~ \^\/(\)agent/\1sounds\|agent/' aladdin/nginx/product.conf
 
 out " - Updating aladdin/docker-compose.yml"
+grep -q vagrant aladdin/docker-compose.yml || (sed -i 's/\("8102\:8102"\)/\1\n      - "4443:4443"/' aladdin/docker-compose.yml
+sed -i 's/KRE_ENV\: dev/KRE_ENV\: vagrant/' aladdin/docker-compose.yml)
 grep -q frontendcp_default aladdin/docker-compose.yml || ( \
 perl -pi -e 's[(\$\{CODE_PATH\}:/code/product)][\1\n      - productdata:/var/www/html/product]gs' aladdin/docker-compose.yml
 perl -pi -e 's[(\$\{CODE_PATH\}:)(/var/www/html/product)][\1/code/product\n      - productdata:\2]gs' aladdin/docker-compose.yml
