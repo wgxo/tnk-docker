@@ -81,7 +81,16 @@ purple "   - aladdin"
 out " - Fixing brewfictus hostname"
 grep -rl brewfictus.kayakodev.com * 2>/dev/null | while read f; do
     # ignore ths script
-    (echo $f | grep -q `basename $0`) || (blue "   - $f" && perl -pi -e 's[brewfictus.kayakodev.com][brewfictus.kayako.com]' $f)
+    (echo $f | grep -q `basename $0`) || (blue "   - $f" && \
+       perl -pi -e 's[brewfictus.kayakodev.com][brewfictus.kayako.com]' $f)
+done
+
+out " - Fixing realtime URL"
+grep -rl -Pe 'wss?://localhost:8102' * 2>/dev/null| while read f; do 
+    # ignore ths script
+    (echo $f | grep -q `basename $0`) || (blue "   - $f"; \
+       perl -pi -e "s[('wss?://)localhost:8102(/socket')][wss://brewfictus.kayako.com:4443\2]gs" $f; \
+       perl -pi -e "s[('wss?://)brewfictus.kayako.com:8102(/socket')][wss://brewfictus.kayako.com:4443\2]gs" $f)
 done
 
 pause
@@ -96,6 +105,8 @@ CODE_PATH=`pwd`/package-product
 BACKEND_PATH=`pwd`/package-backend
 # billing.kayako.com
 BILLING_PATH=`pwd`/package-billing
+GWIP=192.168.1.130
+
 EOF
 
 pause
@@ -126,14 +137,7 @@ services:
       default:
         aliases:
           - brewfictus.kayako.com
-
-networks:
-  default:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.18.0.0/24
-
+          - mykayako.kayako.com
 EOF
 
 pause
@@ -172,11 +176,6 @@ cat <<EOF >> aladdin/docker-compose.yml )
 networks:
   frontendcp_default:
     external: true
-  default:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.19.0.0/24
 
 volumes:
   productdata:
