@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # exit on error
 set -e
@@ -9,17 +9,17 @@ GREEN="\033[1;32m"; WHITE="\033[1;37m"; LIGHT_GRAY="\033[0;37m"; YELLOW="\033[1;
 NOCOLOR="\033[0m"
 
 die() {
-    echo "${RED}ERROR: $@. Exiting.${NOCOLOR}"
+    echo -e "${RED}ERROR: $@. Exiting.${NOCOLOR}"
     exit 1
 }
 
-msg()    echo "${RED}$@${NOCOLOR}"
-green()  echo "${GREEN}$@${NOCOLOR}"
-out()    echo "${BROWN}$@${NOCOLOR}"
-blue()   echo "${BLUE}$@${NOCOLOR}"
-yellow() echo "${YELLOW}$@${NOCOLOR}"
-purple() echo "${PURPLE}$@${NOCOLOR}"
-cyan()   echo "${CYAN}$@${NOCOLOR}"
+msg()   { echo -e "${RED}$@${NOCOLOR}"; }
+green() { echo -e "${GREEN}$@${NOCOLOR}"; }
+out()   { echo -e "${BROWN}$@${NOCOLOR}"; }
+blue()  { echo -e "${BLUE}$@${NOCOLOR}"; }
+yellow(){ echo -e "${YELLOW}$@${NOCOLOR}"; }
+purple(){ echo -e "${PURPLE}$@${NOCOLOR}"; }
+cyan()  { echo -e "${CYAN}$@${NOCOLOR}"; }
 
 BUILD=""
 PAUSE=0
@@ -35,7 +35,7 @@ pause() {
     fi
 }
 
-echo "${LIGHT_RED}*** SETTING UP AND DEPLOYING TNK ***${NOCOLOR}"
+echo -e "${LIGHT_RED}*** SETTING UP AND DEPLOYING TNK ***${NOCOLOR}"
 
 msg "Use [-p] flag to pause between steps and [-f] to force building of containers and reset DB"
 
@@ -115,7 +115,7 @@ out " - Preparing frontend-cp"
 cat <<EOF > frontendcp/entrypoint.sh
 yarn install
 bower --allow-root install
-ember s -H 0.0.0.0 --proxy https://web
+ember s -H 0.0.0.0 --proxy https://web --secure-proxy=false
 EOF
 
 chmod +x frontendcp/entrypoint.sh
